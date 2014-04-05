@@ -1,3 +1,13 @@
+// provides dimmable led array or other DC pulse-modulated by linear 10k pot. When slider/pot has been
+// inactive for a while, turn off automatically.  Then use PIR sensor to switch on & off until
+// slider is used again, which resets the normal use mode timer. 
+// Uses I2C motor driver from Seeed Studio with both outputs tied together.
+// Using at higher power than Seeed's spec but not according to the L298 data sheet.  
+// Kind of a waste for this non-inductive load, but
+// the plan is to add more functions and input sensors to the mini-pro, so the I2C saves time.
+// Both L298 and voltage regulator are heatsinked to aluminium square tubes, top & bottom.
+// surpluss power brick is limited at about 2.5 amps, 19.5 volts.
+
 #include <Wire.h>
 
 #define I2CMotorDriverAdd         0x0f   // Set the address of the I2CMotorDriver
@@ -16,11 +26,10 @@ int sensorPin = A0;    //  input pin for the potentiometer / slider
 int ledPin = 13;      //  pin for the LED
 int sensorValue = 0;  // variable to store the value coming from the slider
 int oldSensorVal = 0; // for comparison
-int dull = 10;        // delta required to register a difference
+int dull = 10;        // delta required to cause action
 int blinkrate = 0;   // sets the led and main lights 'on' time in each duty cycle
-//unsigned long goodnight = 7200000;  // miliseconds of inactivity, then turnoff
-unsigned long goodnight = 400;
-int whodat = 60 * .5 * 1000; // 5 min from pure motion
+//unsigned long goodnight = 7200000;  // wait for these miliseconds of inactivity, then turnoff
+unsigned long goodnight = 7200000;    // entering PIR sensor mode.
 unsigned long countdown = goodnight; // 60*60*2hr*1000ms
 
 void MotorSpeedSetAB(unsigned char MotorSpeedA , unsigned char MotorSpeedB)  {
@@ -60,14 +69,13 @@ void setup()  {
   delayMicroseconds(10000); //wait for motor driver to initialization
   MotorSpeedSetAB(0,0);    // off=0 full-on= 100
   delay(10);             //this delay needed
-  MotorDirectionSet(0b1010);  //0b1010 '+' is pos and '-' is negative
+  MotorDirectionSet(0b1010);  //0b1010 sets '+' to pos and '-' to negative on both outputs
   pinMode(ledPin, OUTPUT); 
-  pinMode(motionPin, INPUT);  // PIR device goes +5v when activated by movement, so pull down
-}
-
+  pinMode(motionPin, INPUT);  // PIR device has: '+' to VCC, 'out' to motionPin, 
+                              // and '-' to 10kohm to GND
 void loop()  {
-  while(1)  {
-  // read the value from the sensor:
+  while(1)  {  //superfluous
+  // read the value from the slider/pot:
   sensorValue = analogRead(sensorPin); 
   if ((oldSensorVal > (sensorValue + dull)) || (oldSensorVal < (sensorValue - 10)))
     {blinkrate = map(sensorValue,0,1023,0,100);
@@ -99,9 +107,8 @@ void loop()  {
       Serial.print("normal");
       Serial.println(alert);
       blinkrate = 30;}
-    countdown = 200;
+    countdown = 200;   // but we don't let that happen
     //Serial.println("sleeping");
-    
     }  
   }
 }
